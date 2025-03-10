@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Service Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #chatContainer {
+      width: 400px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      border-bottom: 1px solid #ddd;
+    }
+    #messages li {
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      max-width: 70%;
+    }
+    #messages li.customer {
+      background-color: #007bff;
+      color: white;
+      align-self: flex-end;
+    }
+    #messages li.representative {
+      background-color: #e9ecef;
+      color: black;
+      align-self: flex-start;
+    }
+    #inputContainer {
+      display: flex;
+      padding: 16px;
+      background-color: #f8f9fa;
+    }
+    #messageInput {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin-right: 8px;
+    }
+    #sendButton {
+      padding: 8px 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #sendButton:hover {
+      background-color: #0056b3;
+    }
+    #popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+    }
+    #popup input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    #popup button {
+      padding: 8px 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #popup button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div id="chatContainer">
+    <ul id="messages"></ul>
+    <div id="inputContainer">
+      <input id="messageInput" autocomplete="off" placeholder="Type your message..." />
+      <button id="sendButton">Send</button>
+    </div>
+  </div>
+
+  <!-- Popup for representative replies -->
+  <div id="popup">
+    <input id="replyInput" placeholder="Type your reply..." />
+    <button id="replyButton">Send Reply</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io('https://custtrial.onrender.com'); // Replace with your backend URL
+    let uid;
+
+    // Automatically register as a customer
+    socket.emit('register as customer');
+
+    // Receive UID from the server
+    socket.on('uid', (id) => {
+      uid = id;
+      console.log(`Your UID: ${uid}`);
+      const li = document.createElement('li');
+      li.textContent = `You are connected with UID: ${uid}`;
+      li.classList.add('customer');
+      document.getElementById('messages').appendChild(li);
+    });
+
+    // Receive messages from the server
+    socket.on('chat message', (msg) => {
+      const li = document.createElement('li');
+      li.textContent = msg;
+      if (msg.startsWith('Customer Service:')) {
+        li.classList.add('representative');
+      } else {
+        li.classList.add('customer');
+      }
+      document.getElementById('messages').appendChild(li);
+      // Scroll to the bottom of the messages
+      document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    });
+
+    // Send message to the server
+    document.getElementById('sendButton').addEventListener('click', () => {
+      const message = document.getElementById('messageInput').value;
+      if (message) {
+        socket.emit('chat message', message);
+        document.getElementById('messageInput').value = '';
+      }
+    });
+
+    // Handle popup for representative replies
+    let currentCustomerUID = null;
+    socket.on('customer message', (data) => {
+      const li = document.createElement('li');
+      li.textContent = `Customer ${data.uid}: ${data.msg}`;
+      li.classList.add('customer');
+      document.getElementById('messages').appendChild(li);
+
+      // Show popup for representative
+      if (data.uid) {
+        currentCustomerUID = data.uid;
+        document.getElementById('popup').style.display = 'block';
+      }
+    });
+
+    // Send reply from popup
+    document.getElementById('replyButton').addEventListener('click', () => {
+      const reply = document.getElementById('replyInput').value;
+      if (reply && currentCustomerUID) {
+        socket.emit('reply', { uid: currentCustomerUID, msg: reply });
+        document.getElementById('replyInput').value = '';
+        document.getElementById('popup').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
